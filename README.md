@@ -41,14 +41,6 @@ Your Memrise password. If you're unhappy with storing storing this in a file on 
 
 ### `voices`
 A list of [AWS Polly voices](https://docs.aws.amazon.com/polly/latest/dg/voicelist.html). For Japanese, AWS Polly currently has Mizuki (femme) and Takumi (masc), so I might have `voices` set to `['Mizuki', 'Takumi']` (the square-brackets indicate a list in JavaScript).
-
-### `voices_parent_path`
-This is a path on your computer under which you've created a subdirectory for each AWS Polly voice. For example, I might have created the following directories:
-- `/Users/me/Documents/Memrise/Takumi` and 
-- `/Users/me/Documents/Memrise/Mizuki`.
-
-Then, `voices_parent_path` should be `/Users/me/Documents/Memrise`. It's the path to the *parent* directory of all voices.
-
 ### `column_indexes`
 Flashcards in your course might contain lots of columns and you might only want one, or a few, of them to be converted to audio. This field lets you control which columns in your course contain text that should be spoken.
 
