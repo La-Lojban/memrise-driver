@@ -62,9 +62,7 @@ function searchForMp3s(texts, voicePaths) {
 }} config
  */
 async function main(config) {
-	const voicePaths = config.voices.map((v) =>
-		join(__dirname, v)
-	);
+	const voicePaths = config.voices.map((v) => join(__dirname, v));
 	const polly = new PollyClient({
 		region: config.aws_region,
 		credentials: {
@@ -170,17 +168,14 @@ async function main(config) {
 					if (savedMp3s.length < config.voices.length) {
 						// we don't have enough audio saved to disk for this row. Let's text-to-speech `relevantTexts[0]`
 						const Text = relevantTexts[0];
-            console.log(Text);
+						console.log(Text);
 						if (Text.includes("/")) {
 							throw new Error(
 								"Remove / (slash) from text (cannot yet reliably save)"
 							);
 						}
 						for (const voice of config.voices) {
-							const mp3path = join(
-								join(__dirname, voice),
-								Text + ".mp3"
-							);
+							const mp3path = join(join(__dirname, voice), Text + ".mp3");
 							if (existsSync(mp3path)) {
 								continue;
 							} // don't rerun Polly if we don't need to!
@@ -198,9 +193,7 @@ async function main(config) {
 							);
 							await audioStreamToDisk(data.AudioStream, mp3path);
 							if (config.verbose) {
-								console.log(
-									`  Saved ${mp3path.replace(__dirname, "…")}`
-								);
+								console.log(`  Saved ${mp3path.replace(__dirname, "…")}`);
 							}
 						}
 					}
@@ -252,9 +245,7 @@ async function main(config) {
 						await upload.uploadFile(mp3);
 
 						if (config.verbose) {
-							console.log(
-								`  Uploaded ${mp3.replace(__dirname, "…")}`
-							);
+							console.log(`  Uploaded ${mp3.replace(__dirname, "…")}`);
 						}
 						await page.waitForTimeout(2000);
 					}
@@ -268,19 +259,15 @@ async function main(config) {
 
 if (module === require.main) {
 	(async () => {
-		if (process.argv[2] || 'config.js') {
-			let pathToConfig = join(__dirname, process.argv[2] || 'config.js');
-			if (!pathToConfig.startsWith("/")) {
-				pathToConfig = join(".BLA_BLA", pathToConfig).replace("BLA_BLA", "");
-			}
-			if (existsSync(pathToConfig)) {
-				var config = require(pathToConfig);
-				await main(config);
-			} else {
-				console.error(`${pathToConfig} not found`);
-			}
+		let pathToConfig = join(__dirname, process.argv[2] || "config.js");
+		if (!pathToConfig.startsWith("/")) {
+			pathToConfig = join(".BLA_BLA", pathToConfig).replace("BLA_BLA", "");
+		}
+		if (existsSync(pathToConfig)) {
+			var config = require(pathToConfig);
+			await main(config);
 		} else {
-			console.error(`REQUIRED: config.js`);
+			console.error(`${pathToConfig} not found`);
 		}
 	})();
 }

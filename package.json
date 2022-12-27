@@ -10,7 +10,8 @@
   "author": "",
   "license": "Unlicense",
   "dependencies": {
-    "@aws-sdk/client-polly": "^3.5.0",
+    "@aws-sdk/client-polly": "^3.238.0",
+    "axios": "^1.2.1",
     "puppeteer": "^19.4.1"
   }
 }

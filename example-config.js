@@ -10,4 +10,7 @@ module.exports = {
   verbose: true,
   bottom_first: true,
   omit_english: false,
+  huggingface: {
+		api: "https://lojban-text-to-speech.hf.space/run/cupra",
+	},
 };
