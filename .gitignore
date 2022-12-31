@@ -8,4 +8,4 @@ mp3s/
 *.json
 geckodriver
 *-downloaded-content/
-mp3s/
+voices/

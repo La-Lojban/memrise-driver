@@ -3,6 +3,7 @@ module.exports = {
   user: '',
   passwd: '',
   voices: ['Vicki'],
+  TextType: "text", //ssml
   column_indexes: [0],
   aws_region: 'us-east-1',
   aws_access_key_id: '',

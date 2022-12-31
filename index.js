@@ -3,20 +3,27 @@ const {
 	PollyClient,
 	SynthesizeSpeechCommand,
 } = require("@aws-sdk/client-polly");
+const fs = require("fs");
 const { join } = require("path");
 const { existsSync, createWriteStream } = require("fs");
 const { Stream } = require("stream");
 const { text2SSML } = require("./lojban.js");
+const clc = require("cli-color");
+
 // HELPERS
 /**
  * Given a stream, save it to disk. Returns a promise that resolves after the stream is closed (hopefully the file will
  * be ready then?)
  * @param {Stream} stream
- * @param {string} path
+ * @param {string} filepath
  */
-function audioStreamToDisk(stream, path) {
-	return new Promise((resolve, reject) =>
-		stream.pipe(createWriteStream(path)).on("close", () => resolve())
+function audioStreamToDisk(stream, filepath) {
+	if (!fs.existsSync(join(filepath, ".."))) {
+		fs.mkdirSync(join(filepath, "../.."));
+		fs.mkdirSync(join(filepath, ".."));
+	}
+	return new Promise((resolve) =>
+		stream.pipe(createWriteStream(filepath)).on("close", () => resolve())
 	);
 }
 
@@ -33,9 +40,9 @@ function searchForMp3s(texts, voicePaths) {
 	/** @type{string[]} */
 	const ret = [];
 
-	for (const path of voicePaths) {
+	for (const filepath of voicePaths) {
 		for (const text of texts) {
-			const candidate = join(path, text + ".mp3");
+			const candidate = join(filepath, text.replace(/\//g, " ") + ".mp3");
 			if (existsSync(candidate)) {
 				ret.push(candidate);
 				break;
@@ -62,7 +69,7 @@ function searchForMp3s(texts, voicePaths) {
 }} config
  */
 async function main(config) {
-	const voicePaths = config.voices.map((v) => join(__dirname, v));
+	const voicePaths = config.voices.map((v) => join(__dirname, "voices", v));
 	const polly = new PollyClient({
 		region: config.aws_region,
 		credentials: {
@@ -98,7 +105,7 @@ async function main(config) {
 
 	const levels = await page.$$("div.level");
 	if (config.verbose) {
-		console.log(`${levels.length} levels found`);
+		console.log(clc.red.bgWhite.underline(`${levels.length} levels found`));
 	}
 	if (config.bottom_first) {
 		levels.reverse();
@@ -109,19 +116,20 @@ async function main(config) {
 
 		const button = await level.$(".show-hide.btn.btn-small");
 		if (button) {
-			await Promise.all([button.click(), page.waitForTimeout(1500)]);
+			await Promise.all([button.click(), page.waitForTimeout(5500)]);
 			// we've expanded the level and can see all the cards inside
-
+			let handle = "",
+				name = "";
 			if (config.verbose) {
-				const handle = await level.$eval(".level-handle", (o) =>
+				handle = await level.$eval(".level-handle", (o) =>
 					o.textContent.trim()
 				);
-				const name = await level.$eval(".level-name", (o) =>
-					o.textContent.trim()
-				);
-				console.log(`Opened #${handle}: ${name}`);
+				name = await level.$eval(".level-name", (o) => o.textContent.trim());
+				console.log(clc.blue(`Opened #${handle}: ${name}`));
 				console.log(
-					`${(await page.$$(`#${levelId} tr.thing`)).length} <tr>s found`
+					clc.yellow.bold(
+						`${(await page.$$(`#${levelId} tr.thing`)).length} <tr>s found`
+					)
 				);
 			}
 
@@ -140,12 +148,20 @@ async function main(config) {
 					relevantTexts = relevantTexts.filter((s) => !s.match(/[a-zA-Z]/));
 				}
 				if (config.verbose) {
-					console.log(` Looking at row ${relevantTexts.join("//")}`);
+					console.log(
+						[
+							clc.bold.red.bgWhite(`${relevantTexts.join("//")}`),
+							clc.bold.cyan(handle),
+							clc.bold.cyan(name),
+						].join(" | ")
+					);
 				}
 
 				const onlineMp3s = await tr.$$("a.audio-player[data-url]");
 				if (config.verbose) {
-					console.log(`  ${onlineMp3s.length} mp3s found already online`);
+					console.log(
+						clc.cyan(`  ${onlineMp3s.length} mp3s found already online`)
+					);
 				}
 
 				// Assuming we have some text that ought to be speech, are there fewer mp3s than voices?
@@ -159,41 +175,46 @@ async function main(config) {
 					const savedMp3s = searchForMp3s(relevantTexts, voicePaths);
 					if (config.verbose) {
 						console.log(
-							`  ${savedMp3s.length} mp3s locally available: ${savedMp3s
-								.map((s) => s.replace(__dirname, "…"))
-								.join(", ")}`
+							clc.cyan(
+								`  ${savedMp3s.length} mp3s locally available: ` +
+									`${savedMp3s
+										.map((s) => s.replace(__dirname + "/voices", "…"))
+										.join(", ")}`
+							)
 						);
 					}
 					// did we find an mp3 for each voice?
 					if (savedMp3s.length < config.voices.length) {
 						// we don't have enough audio saved to disk for this row. Let's text-to-speech `relevantTexts[0]`
 						const Text = relevantTexts[0];
-						console.log(Text);
-						if (Text.includes("/")) {
-							throw new Error(
-								"Remove / (slash) from text (cannot yet reliably save)"
-							);
-						}
+						// console.log(`  text: ` + clc.bold.blue(Text));
 						for (const voice of config.voices) {
-							const mp3path = join(join(__dirname, voice), Text + ".mp3");
+							const mp3path = join(
+								join(__dirname, "voices", voice),
+								Text.replace(/\//g, " ") + ".mp3"
+							);
 							if (existsSync(mp3path)) {
 								continue;
 							} // don't rerun Polly if we don't need to!
 							if (config.verbose) {
-								console.log(`  Generating ${Text} with ${voice}`);
+								console.log(
+									`  Generating ` + clc.red.italic(Text) + ` with ${voice}`
+								);
 							}
 							const data = await polly.send(
 								new SynthesizeSpeechCommand({
 									VoiceId: voice,
 									OutputFormat: "mp3",
-									Text: text2SSML(Text),
+									Text: config.TextType === "ssml" ? text2SSML(Text) : Text,
 									Engine: "neural",
-									TextType: "ssml",
+									TextType: config.TextType,
 								})
 							);
 							await audioStreamToDisk(data.AudioStream, mp3path);
 							if (config.verbose) {
-								console.log(`  Saved ${mp3path.replace(__dirname, "…")}`);
+								console.log(
+									`  Saved ` + clc.green(`${mp3path.replace(__dirname, "…")}`)
+								);
 							}
 						}
 					}
@@ -202,17 +223,14 @@ async function main(config) {
 				const savedMp3s = searchForMp3s(relevantTexts, voicePaths);
 				if (config.verbose) {
 					console.log(
-						`  ${savedMp3s.length} mp3s locally available: ${savedMp3s
-							.map((s) => s.replace(__dirname, "…"))
-							.join(", ")}`
+						`  ${savedMp3s.length} mp3s locally available: ` +
+							clc.italic(
+								`${savedMp3s.map((s) => s.replace(__dirname, "…")).join(", ")}`
+							)
 					);
 				}
 
-				if (
-					/*onlineMp3s.length>config.voices.length ||*/ savedMp3s.length >
-						onlineMp3s.length &&
-					onlineMp3s.length === 0
-				) {
+				if (savedMp3s.length > onlineMp3s.length && onlineMp3s.length === 0) {
 					// delete all audio before we upload these
 					if (onlineMp3s.length > 0) {
 						await (await tr.$("td.audio button.dropdown-toggle")).click();
@@ -245,7 +263,10 @@ async function main(config) {
 						await upload.uploadFile(mp3);
 
 						if (config.verbose) {
-							console.log(`  Uploaded ${mp3.replace(__dirname, "…")}`);
+							console.log(
+								`  Uploaded ` +
+									clc.green.italic(`${mp3.replace(__dirname, "…")}`)
+							);
 						}
 						await page.waitForTimeout(2000);
 					}
